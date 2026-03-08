@@ -21,6 +21,7 @@ const allowlist = [
   "nanoid",
   "nodemailer",
   "openai",
+  "yahoo-finance2",
   "passport",
   "passport-local",
   "pg",
