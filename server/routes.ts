@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import OpenAI from "openai";
 import YahooFinance from "yahoo-finance2";
+import rateLimit from "express-rate-limit";
 
 const deepseek = new OpenAI({
   apiKey: process.env.DEEPSEEK_API_KEY,
@@ -10,6 +11,17 @@ const deepseek = new OpenAI({
 
 // yahoo-finance2 v3 requires instantiation
 const yf: any = new (YahooFinance as any)();
+
+// create a rate limiter middleware
+const analyzeLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5, // limit each IP to 5 analyze requests per windowMs
+  message: {
+    error: "Too many analysis requests from this IP, please try again later."
+  },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+})
 
 async function fetchYahooQuote(symbol: string): Promise<any> {
   try {
@@ -102,9 +114,10 @@ export async function registerRoutes(
     }
   });
 
-  app.post("/api/analyze/:symbol", async (req, res) => {
+  // Analysis endpoint with streaming response and rate limiting
+  app.post("/api/analyze/:symbol", analyzeLimiter, async (req, res) => {
     try {
-      const symbol = req.params.symbol.toUpperCase();
+      const symbol = String(req.params.symbol).toUpperCase();
       const quote = await fetchYahooQuote(symbol);
       if (!quote) return res.status(404).json({ error: "Symbol not found" });
 
