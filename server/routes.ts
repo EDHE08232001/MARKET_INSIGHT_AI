@@ -1,15 +1,15 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import OpenAI from "openai";
-import yahooFinance from "yahoo-finance2";
+import YahooFinance from "yahoo-finance2";
 
 const deepseek = new OpenAI({
   apiKey: process.env.DEEPSEEK_API_KEY,
   baseURL: process.env.DEEPSEEK_BASE_URL,
 });
 
-// Use 'any' cast to avoid strict typing issues with validateResult option
-const yf = yahooFinance as any;
+// yahoo-finance2 v3 requires instantiation
+const yf: any = new (YahooFinance as any)();
 
 async function fetchYahooQuote(symbol: string): Promise<any> {
   try {
