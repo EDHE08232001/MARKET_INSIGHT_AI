@@ -1,73 +1,80 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import OpenAI from "openai";
+import yahooFinance from "yahoo-finance2";
 
 const deepseek = new OpenAI({
   apiKey: process.env.DEEPSEEK_API_KEY,
   baseURL: process.env.DEEPSEEK_BASE_URL,
 });
 
+// Use 'any' cast to avoid strict typing issues with validateResult option
+const yf = yahooFinance as any;
+
 async function fetchYahooQuote(symbol: string): Promise<any> {
   try {
-    const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5d&interval=1d`;
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      },
-    });
-    if (!res.ok) throw new Error(`Yahoo Finance returned ${res.status}`);
-    const data = await res.json();
-    const result = data.chart?.result?.[0];
-    const meta = result?.meta;
-    if (!meta) throw new Error("No data found");
+    const fiveDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    const closes = result?.indicators?.quote?.[0]?.close || [];
-    const timestamps = result?.timestamp || [];
-    const history = timestamps.map((t: number, i: number) => ({
-      date: new Date(t * 1000).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-      close: closes[i],
-    })).filter((d: any) => d.close != null);
+    const [quote, chart] = await Promise.all([
+      yf.quote(symbol),
+      yf.chart(symbol, { period1: fiveDaysAgo, interval: "1d" }).catch(() => null),
+    ]);
+
+    if (!quote || !quote.regularMarketPrice) {
+      throw new Error("No market data found");
+    }
+
+    let history: { date: string; close: number }[] = [];
+    if (chart?.timestamp && chart.indicators?.quote?.[0]) {
+      const closes = chart.indicators.quote[0].close || [];
+      history = chart.timestamp
+        .map((t: number, i: number) => ({
+          date: new Date(t * 1000).toLocaleDateString("en-US", {
+            month: "short",
+            day: "numeric",
+          }),
+          close: closes[i],
+        }))
+        .filter((d: any) => d.close != null);
+    }
+
+    const currentPrice = quote.regularMarketPrice ?? 0;
+    const previousClose = quote.regularMarketPreviousClose ?? currentPrice;
 
     return {
-      symbol: meta.symbol,
-      name: meta.longName || meta.shortName || meta.symbol,
-      currentPrice: meta.regularMarketPrice,
-      previousClose: meta.previousClose || meta.chartPreviousClose,
-      change: meta.regularMarketPrice - (meta.previousClose || meta.chartPreviousClose || meta.regularMarketPrice),
-      changePercent: ((meta.regularMarketPrice - (meta.previousClose || meta.chartPreviousClose || meta.regularMarketPrice)) / (meta.previousClose || meta.chartPreviousClose || meta.regularMarketPrice)) * 100,
-      dayHigh: meta.regularMarketDayHigh || meta.regularMarketPrice,
-      dayLow: meta.regularMarketDayLow || meta.regularMarketPrice,
-      volume: meta.regularMarketVolume || 0,
-      fiftyTwoWeekHigh: meta.fiftyTwoWeekHigh,
-      fiftyTwoWeekLow: meta.fiftyTwoWeekLow,
-      currency: meta.currency || "USD",
-      exchangeName: meta.exchangeName || meta.fullExchangeName || "",
-      instrumentType: meta.instrumentType || "EQUITY",
+      symbol: quote.symbol,
+      name: quote.longName || quote.shortName || quote.symbol,
+      currentPrice,
+      previousClose,
+      change: quote.regularMarketChange ?? currentPrice - previousClose,
+      changePercent: quote.regularMarketChangePercent ?? 0,
+      dayHigh: quote.regularMarketDayHigh ?? currentPrice,
+      dayLow: quote.regularMarketDayLow ?? currentPrice,
+      volume: quote.regularMarketVolume ?? 0,
+      fiftyTwoWeekHigh: quote.fiftyTwoWeekHigh,
+      fiftyTwoWeekLow: quote.fiftyTwoWeekLow,
+      currency: quote.currency || "USD",
+      exchangeName: quote.fullExchangeName || (quote as any).exchangeName || "",
+      instrumentType: quote.quoteType || "EQUITY",
       history,
     };
   } catch (error) {
-    console.error(`Error fetching quote for ${symbol}:`, error);
+    console.error(`[quote] Error fetching ${symbol}:`, error);
     return null;
   }
 }
 
 async function searchSymbols(query: string): Promise<any[]> {
   try {
-    const url = `https://query1.finance.yahoo.com/v1/finance/search?q=${encodeURIComponent(query)}&quotesCount=8&newsCount=0`;
-    const res = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-      },
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    return (data.quotes || []).map((q: any) => ({
+    const results = await yf.search(query, { quotesCount: 8, newsCount: 0 });
+    return ((results.quotes as any[]) || []).map((q: any) => ({
       symbol: q.symbol,
       name: q.longname || q.shortname || q.symbol,
       type: q.quoteType || "EQUITY",
-      exchange: q.exchDisp || q.exchange,
+      exchange: q.exchDisp || q.exchange || "",
     }));
-  } catch {
+  } catch (error) {
+    console.error(`[search] Error for "${query}":`, error);
     return [];
   }
 }
@@ -76,7 +83,6 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-
   app.get("/api/search/:query", async (req, res) => {
     try {
       const results = await searchSymbols(req.params.query);
@@ -150,7 +156,9 @@ Provide your analysis as a JSON object.`,
         const content = chunk.choices[0]?.delta?.content || "";
         if (content) {
           fullResponse += content;
-          res.write(`data: ${JSON.stringify({ type: "content", data: content })}\n\n`);
+          res.write(
+            `data: ${JSON.stringify({ type: "content", data: content })}\n\n`
+          );
         }
       }
 
@@ -172,12 +180,16 @@ Provide your analysis as a JSON object.`,
         };
       }
 
-      res.write(`data: ${JSON.stringify({ type: "complete", analysis: parsed })}\n\n`);
+      res.write(
+        `data: ${JSON.stringify({ type: "complete", analysis: parsed })}\n\n`
+      );
       res.end();
     } catch (error) {
       console.error("Error analyzing:", error);
       if (res.headersSent) {
-        res.write(`data: ${JSON.stringify({ type: "error", error: "Analysis failed" })}\n\n`);
+        res.write(
+          `data: ${JSON.stringify({ type: "error", error: "Analysis failed" })}\n\n`
+        );
         res.end();
       } else {
         res.status(500).json({ error: "Analysis failed" });
