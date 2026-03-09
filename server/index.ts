@@ -4,7 +4,11 @@ import { serveStatic } from "./static";
 import { createServer } from "http";
 
 const app = express();
-app.set("trust proxy", true); // trust first proxy for correct client IPs
+// Azure App Service sits behind exactly 1 proxy (the platform's load balancer).
+// Using the number `1` instead of `true` means Express only trusts the
+// rightmost hop added by Azure — clients cannot spoof the IP by injecting a
+// custom X-Forwarded-For header, which would bypass the rate limiter.
+app.set("trust proxy", 1);
 const httpServer = createServer(app);
 
 declare module "http" {

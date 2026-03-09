@@ -12,16 +12,35 @@ const deepseek = new OpenAI({
 // yahoo-finance2 v3 requires instantiation
 const yf: any = new (YahooFinance as any)();
 
-// create a rate limiter middleware
+// Rate limiter for the /api/analyze route.
+//
+// Key fixes for Azure App Service:
+//   - `limit` replaces the removed `max` option (express-rate-limit v8)
+//   - `standardHeaders: "draft-7"` follows the IETF RateLimit header RFC
+//   - `keyGenerator` explicitly resolves the real client IP so the limiter
+//     never falls back to undefined keys (which would make it a no-op)
+//   - `validate.trustProxy: false` suppresses the library's own proxy
+//     validation — we handle that via `app.set("trust proxy", 1)` in index.ts
+//   - `handler` sends a structured JSON 429 with a Retry-After hint
 const analyzeLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // limit each IP to 5 analyze requests per windowMs
-  message: {
-    error: "Too many analysis requests from this IP, please try again later."
+  windowMs: 15 * 60 * 1000, // 15-minute sliding window
+  limit: 5,                  // max 5 analysis requests per IP per window
+  standardHeaders: "draft-7",
+  legacyHeaders: false,
+  // Explicitly extract the real client IP.
+  // With `trust proxy: 1` set on the Express app, `req.ip` is already the
+  // de-spoofed client IP forwarded by Azure's load balancer.
+  keyGenerator: (req) => req.ip ?? req.socket.remoteAddress ?? "unknown",
+  // Return a structured JSON error instead of a plain-text string.
+  handler: (_req, res) => {
+    res.status(429).json({
+      error: "Too many analysis requests. You are limited to 5 requests per 15 minutes.",
+      retryAfter: "15 minutes",
+    });
   },
-  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
-  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-})
+  // We configure trust proxy ourselves — skip the library's redundant check.
+  validate: { trustProxy: false },
+});
 
 async function fetchYahooQuote(symbol: string): Promise<any> {
   try {
