@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import type { Quote, Analysis } from "@shared/schema";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,6 +22,7 @@ import {
   DollarSign,
   ArrowUpDown,
   ChevronRight,
+  Clock,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -51,6 +52,31 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [streamingContent, setStreamingContent] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  // null = not rate-limited; Date = when the current window resets
+  const [rateLimitResetAt, setRateLimitResetAt] = useState<Date | null>(null);
+  const [rateLimitCountdown, setRateLimitCountdown] = useState("");
+
+  // Tick every second while rate-limited, auto-clear when window resets
+  useEffect(() => {
+    if (!rateLimitResetAt) {
+      setRateLimitCountdown("");
+      return;
+    }
+    const tick = () => {
+      const msLeft = rateLimitResetAt.getTime() - Date.now();
+      if (msLeft <= 0) {
+        setRateLimitResetAt(null);
+        return;
+      }
+      const totalSeconds = Math.ceil(msLeft / 1000);
+      const m = Math.floor(totalSeconds / 60).toString().padStart(2, "0");
+      const s = (totalSeconds % 60).toString().padStart(2, "0");
+      setRateLimitCountdown(`${m}:${s}`);
+    };
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [rateLimitResetAt]);
 
   const isPositive = quote.change >= 0;
   const priceFromLow =
@@ -72,6 +98,17 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
         `/api/analyze/${encodeURIComponent(quote.symbol)}`,
         { method: "POST" }
       );
+
+      // Handle rate limit: parse the reset window and start the countdown
+      if (res.status === 429) {
+        // `Retry-After` (seconds) is set by our handler from `RateLimit-Reset`
+        const retryAfter = res.headers.get("Retry-After");
+        const secondsUntilReset = retryAfter ? parseInt(retryAfter, 10) : 15 * 60;
+        setRateLimitResetAt(new Date(Date.now() + secondsUntilReset * 1000));
+        setIsAnalyzing(false);
+        return;
+      }
+
       if (!res.ok) throw new Error("Analysis failed");
 
       const reader = res.body?.getReader();
@@ -402,16 +439,22 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
           <Button
             data-testid="button-analyze"
             onClick={runAnalysis}
-            disabled={isAnalyzing}
+            disabled={isAnalyzing || !!rateLimitResetAt}
             size="sm"
             className="rounded-xl gap-1.5 shadow-sm"
           >
             {isAnalyzing ? (
               <Loader2 className="w-3.5 h-3.5 animate-spin" />
+            ) : rateLimitResetAt ? (
+              <Clock className="w-3.5 h-3.5" />
             ) : (
               <Sparkles className="w-3.5 h-3.5" />
             )}
-            {isAnalyzing ? "Analyzing…" : "Analyze with AI"}
+            {isAnalyzing
+              ? "Analyzing…"
+              : rateLimitResetAt
+              ? rateLimitCountdown
+              : "Analyze with AI"}
           </Button>
         </div>
 
@@ -442,7 +485,7 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
         </AnimatePresence>
 
         {/* Placeholder before analysis */}
-        {!analysis && !isAnalyzing && (
+        {!analysis && !isAnalyzing && !rateLimitResetAt && (
           <Card className="border-border/50 border-dashed">
             <CardContent className="py-14 text-center">
               <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mx-auto mb-4">
@@ -467,6 +510,64 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
             </CardContent>
           </Card>
         )}
+
+        {/* Rate limit reached card */}
+        <AnimatePresence>
+          {rateLimitResetAt && !isAnalyzing && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <Card className="border-amber-200/70 dark:border-amber-800/40 bg-amber-50/50 dark:bg-amber-950/20">
+                <CardContent className="py-12 text-center">
+                  {/* Pulsing icon */}
+                  <div className="relative w-16 h-16 mx-auto mb-5">
+                    <div
+                      className="absolute inset-0 rounded-2xl bg-amber-200/60 dark:bg-amber-700/20 animate-ping"
+                      style={{ animationDuration: "2s" }}
+                    />
+                    <div className="relative w-16 h-16 rounded-2xl bg-amber-100 dark:bg-amber-900/50 border border-amber-200 dark:border-amber-700/50 flex items-center justify-center">
+                      <Clock className="w-7 h-7 text-amber-600 dark:text-amber-400" />
+                    </div>
+                  </div>
+
+                  {/* Title */}
+                  <p className="text-base font-semibold text-amber-900 dark:text-amber-200 mb-1.5">
+                    Rate Limit Reached
+                  </p>
+                  <p className="text-xs text-amber-700/80 dark:text-amber-400/70 mb-7 max-w-[260px] mx-auto leading-relaxed">
+                    You've used all{" "}
+                    <span className="font-semibold">5 AI analyses</span> for
+                    this 15-minute window. Come back in:
+                  </p>
+
+                  {/* Countdown clock */}
+                  <div className="inline-flex flex-col items-center gap-1.5 bg-white/70 dark:bg-amber-950/60 border border-amber-200/80 dark:border-amber-700/40 rounded-2xl px-10 py-5 mb-5 shadow-sm">
+                    <span className="text-4xl font-mono font-bold text-amber-700 dark:text-amber-300 tabular-nums tracking-[0.12em]">
+                      {rateLimitCountdown}
+                    </span>
+                    <span className="text-[10px] font-semibold text-amber-500/70 dark:text-amber-500/60 uppercase tracking-[0.2em]">
+                      mm &nbsp;:&nbsp; ss
+                    </span>
+                  </div>
+
+                  {/* Exact reset time */}
+                  <p className="text-xs text-amber-600/60 dark:text-amber-500/60">
+                    Your limit resets at{" "}
+                    <span className="font-semibold text-amber-700/80 dark:text-amber-400/80">
+                      {rateLimitResetAt.toLocaleTimeString(undefined, {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </p>
+                </CardContent>
+              </Card>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Completed analysis */}
         <AnimatePresence>
