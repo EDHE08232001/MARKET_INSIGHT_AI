@@ -32,10 +32,16 @@ const analyzeLimiter = rateLimit({
   // de-spoofed client IP forwarded by Azure's load balancer.
   keyGenerator: (req) => req.ip ?? req.socket.remoteAddress ?? "unknown",
   // Return a structured JSON error instead of a plain-text string.
+  // Mirror the draft-7 `RateLimit-Reset` value as the standard `Retry-After`
+  // header so the client can build an accurate countdown without needing to
+  // parse non-standard headers.
   handler: (_req, res) => {
+    const resetIn = res.getHeader("RateLimit-Reset");
+    if (resetIn !== undefined) {
+      res.setHeader("Retry-After", String(resetIn));
+    }
     res.status(429).json({
       error: "Too many analysis requests. You are limited to 5 requests per 15 minutes.",
-      retryAfter: "15 minutes",
     });
   },
   // We configure trust proxy ourselves — skip the library's redundant check.
