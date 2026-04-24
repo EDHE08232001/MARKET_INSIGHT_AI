@@ -155,7 +155,7 @@ export async function registerRoutes(
       res.setHeader("Connection", "keep-alive");
 
       const stream = await deepseek.chat.completions.create({
-        model: "deepseek-chat",
+        model: "deepseek-v4-flash",
         messages: [
           {
             role: "system",
