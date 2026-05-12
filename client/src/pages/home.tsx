@@ -125,11 +125,9 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background flex flex-col">
-      {/* ── Header ── */}
       <header className="border-b border-border/60 bg-background/80 backdrop-blur-xl sticky top-0 z-50">
         <div className="max-w-5xl mx-auto px-4 sm:px-6">
           <div className="flex items-center justify-between gap-3 h-14">
-            {/* Logo */}
             <button
               data-testid="button-home"
               onClick={handleClear}
@@ -143,7 +141,6 @@ export default function Home() {
               </span>
             </button>
 
-            {/* Search bar shown in header when viewing an asset */}
             {!isLanding && (
               <div ref={searchRef} className="relative flex-1 max-w-md">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
@@ -201,7 +198,6 @@ export default function Home() {
               </div>
             )}
 
-            {/* Theme toggle */}
             <Button
               data-testid="button-toggle-theme"
               variant="ghost"
@@ -220,10 +216,8 @@ export default function Home() {
       </header>
 
       <main className="flex-1">
-        {/* ── Landing page ── */}
         {isLanding && (
           <div className="relative min-h-[calc(100vh-3.5rem)] flex flex-col items-center justify-center px-4 overflow-hidden">
-            {/* Gradient orbs in background */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none select-none">
               <div
                 className="orb-1 absolute w-[520px] h-[520px] rounded-full opacity-40 dark:opacity-20"
@@ -254,14 +248,12 @@ export default function Home() {
               />
             </div>
 
-            {/* Hero content */}
             <motion.div
               initial={{ opacity: 0, y: 24 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
               className="relative z-10 text-center w-full max-w-2xl mx-auto"
             >
-              {/* Badge */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
@@ -272,7 +264,6 @@ export default function Home() {
                 AI-Powered Market Intelligence
               </motion.div>
 
-              {/* Headline */}
               <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight mb-5 leading-[1.08]">
                 <span className="text-gradient-animated">Market</span>
                 <br />
@@ -284,7 +275,6 @@ export default function Home() {
                 ETFs, commodities, and crypto.
               </p>
 
-              {/* Search bar */}
               <div ref={searchRef} className="relative w-full max-w-xl mx-auto">
                 <div className="relative">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground pointer-events-none z-10" />
@@ -302,7 +292,6 @@ export default function Home() {
                   )}
                 </div>
 
-                {/* Dropdown */}
                 <AnimatePresence>
                   {showResults && results.length > 0 && (
                     <motion.div
@@ -348,7 +337,6 @@ export default function Home() {
                 </AnimatePresence>
               </div>
 
-              {/* Quick-access chips */}
               <div className="flex items-center gap-2 mt-6 flex-wrap justify-center">
                 <span className="text-xs text-muted-foreground font-medium">
                   Popular:
@@ -366,7 +354,6 @@ export default function Home() {
               </div>
             </motion.div>
 
-            {/* Feature pills at bottom */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -386,7 +373,6 @@ export default function Home() {
           </div>
         )}
 
-        {/* ── Loading state ── */}
         {loadingQuote && (
           <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
             <div className="relative">
@@ -401,12 +387,10 @@ export default function Home() {
           </div>
         )}
 
-        {/* ── Asset detail ── */}
         {selectedSymbol && quote && !loadingQuote && (
           <AssetDetail quote={quote} onBack={handleClear} />
         )}
 
-        {/* ── Symbol not found ── */}
         {selectedSymbol && !quote && !loadingQuote && (
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -435,7 +419,6 @@ export default function Home() {
         )}
       </main>
 
-      {/* ── Footer ── */}
       <footer className="border-t border-border/50 py-4 mt-auto">
         <p className="text-xs text-muted-foreground/60 text-center px-4">
           MarketPulse uses AI for analysis purposes only. Not financial advice.
