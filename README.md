@@ -1,40 +1,38 @@
-# MarketPulse - AI-Powered Market Tracker
+# MarketPulse
 
-## Overview
-A clean, search-based web app for looking up stock, ETF, commodity, and crypto prices with AI-powered analysis. No database needed — just search, view, and analyze.
+Search-based web app for looking up stock, ETF, commodity, and crypto prices with AI-assisted analysis. No database.
 
-## Architecture
-- **Frontend**: React + TypeScript + Vite + TailwindCSS + shadcn/ui + Recharts
-- **Backend**: Express.js + TypeScript
-- **AI**: DeepSeek (via OpenAI-compatible SDK, user's own API key)
-- **Market Data**: Yahoo Finance public API
+## Stack
+- Frontend: React + TypeScript + Vite + TailwindCSS + shadcn/ui + Recharts
+- Backend: Express.js + TypeScript
+- AI: DeepSeek (via OpenAI-compatible SDK)
+- Market data: Yahoo Finance public API
 
-## Key Features
-- Search any stock, ETF, commodity, or crypto symbol
-- Beautiful asset detail page with live price, chart, and stats
-- AI-powered analysis with buy price, target price, stop loss, sentiment
-- Streaming AI analysis responses from DeepSeek
-- Dark/light mode toggle
-- Quick-access buttons for popular symbols
+## Features
+- Symbol search (stocks, ETFs, commodities, crypto)
+- Asset detail page with live price, 5-day chart, and stats
+- AI analysis: buy price, target, stop loss, sentiment (SSE streaming)
+- Dark/light theme
+- Quick-access buttons for common symbols
 
-## Project Structure
+## Layout
 ```
-shared/schema.ts                  - Zod types (Quote, SearchResult, Analysis)
-server/routes.ts                  - API routes (search, quote, analyze)
-server/storage.ts                 - Empty (no database needed)
-client/src/App.tsx                - Main app entry
-client/src/pages/home.tsx         - Landing page with search
+shared/schema.ts          Zod types (Quote, SearchResult, Analysis)
+server/routes.ts          API routes
+server/index.ts           Express entry
+client/src/App.tsx        App root
+client/src/pages/home.tsx Landing + search
 client/src/components/
-  asset-detail.tsx                - Asset detail page with chart and analysis
-  theme-provider.tsx              - Dark mode provider
-  price-badge.tsx                 - Price change formatting
+  asset-detail.tsx        Asset detail page
+  theme-provider.tsx      Dark mode
+  price-badge.tsx         Price change formatting
 ```
 
-## API Endpoints
-- `GET /api/search/:query` - Search symbols
-- `GET /api/quote/:symbol` - Fetch live quote with 5-day history
-- `POST /api/analyze/:symbol` - Run AI analysis (SSE streaming via DeepSeek)
+## API
+- `GET /api/search/:query` — search symbols
+- `GET /api/quote/:symbol` — quote with 5-day history
+- `POST /api/analyze/:symbol` — AI analysis (SSE)
 
-## Environment Variables
-- `DEEPSEEK_API_KEY` - DeepSeek API key
-- `DEEPSEEK_BASE_URL` - DeepSeek base URL
+## Env
+- `DEEPSEEK_API_KEY`
+- `DEEPSEEK_BASE_URL`

@@ -12,29 +12,13 @@ const deepseek = new OpenAI({
 // yahoo-finance2 v3 requires instantiation
 const yf: any = new (YahooFinance as any)();
 
-// Rate limiter for the /api/analyze route.
-//
-// Key fixes for Azure App Service:
-//   - `limit` replaces the removed `max` option (express-rate-limit v8)
-//   - `standardHeaders: "draft-7"` follows the IETF RateLimit header RFC
-//   - `keyGenerator` explicitly resolves the real client IP so the limiter
-//     never falls back to undefined keys (which would make it a no-op)
-//   - `validate.trustProxy: false` suppresses the library's own proxy
-//     validation — we handle that via `app.set("trust proxy", 1)` in index.ts
-//   - `handler` sends a structured JSON 429 with a Retry-After hint
+// 5 analysis requests per IP per 15 min. Trust proxy is configured in index.ts.
 const analyzeLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15-minute sliding window
-  limit: 5,                  // max 5 analysis requests per IP per window
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
   standardHeaders: "draft-7",
   legacyHeaders: false,
-  // Explicitly extract the real client IP.
-  // With `trust proxy: 1` set on the Express app, `req.ip` is already the
-  // de-spoofed client IP forwarded by Azure's load balancer.
   keyGenerator: (req) => req.ip ?? req.socket.remoteAddress ?? "unknown",
-  // Return a structured JSON error instead of a plain-text string.
-  // Mirror the draft-7 `RateLimit-Reset` value as the standard `Retry-After`
-  // header so the client can build an accurate countdown without needing to
-  // parse non-standard headers.
   handler: (_req, res) => {
     const resetIn = res.getHeader("RateLimit-Reset");
     if (resetIn !== undefined) {
@@ -44,7 +28,6 @@ const analyzeLimiter = rateLimit({
       error: "Too many analysis requests. You are limited to 5 requests per 15 minutes.",
     });
   },
-  // We configure trust proxy ourselves — skip the library's redundant check.
   validate: { trustProxy: false },
 });
 
@@ -139,7 +122,6 @@ export async function registerRoutes(
     }
   });
 
-  // Analysis endpoint with streaming response and rate limiting
   app.post("/api/analyze/:symbol", analyzeLimiter, async (req, res) => {
     try {
       const symbol = String(req.params.symbol).toUpperCase();

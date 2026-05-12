@@ -52,11 +52,9 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [streamingContent, setStreamingContent] = useState("");
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  // null = not rate-limited; Date = when the current window resets
   const [rateLimitResetAt, setRateLimitResetAt] = useState<Date | null>(null);
   const [rateLimitCountdown, setRateLimitCountdown] = useState("");
 
-  // Tick every second while rate-limited, auto-clear when window resets
   useEffect(() => {
     if (!rateLimitResetAt) {
       setRateLimitCountdown("");
@@ -99,9 +97,7 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
         { method: "POST" }
       );
 
-      // Handle rate limit: parse the reset window and start the countdown
       if (res.status === 429) {
-        // `Retry-After` (seconds) is set by our handler from `RateLimit-Reset`
         const retryAfter = res.headers.get("Retry-After");
         const secondsUntilReset = retryAfter ? parseInt(retryAfter, 10) : 15 * 60;
         setRateLimitResetAt(new Date(Date.now() + secondsUntilReset * 1000));
@@ -200,7 +196,6 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
       transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
       className="max-w-5xl mx-auto px-4 sm:px-6 py-6"
     >
-      {/* Back nav */}
       <button
         data-testid="button-back"
         onClick={onBack}
@@ -210,7 +205,6 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
         Back to search
       </button>
 
-      {/* ── Price Header ── */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-6 mb-8">
         <div>
           <div className="flex items-center gap-3 flex-wrap mb-1.5">
@@ -252,7 +246,6 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
         </div>
       </div>
 
-      {/* ── 5-Day Chart ── */}
       {quote.history.length > 1 && (
         <Card className="mb-6 overflow-hidden border-border/60">
           <CardHeader className="pb-0 pt-4 px-5">
@@ -339,7 +332,6 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
         </Card>
       )}
 
-      {/* ── Stats Grid ── */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
         {[
           {
@@ -385,7 +377,6 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
         ))}
       </div>
 
-      {/* ── 52-Week Position ── */}
       {quote.fiftyTwoWeekLow != null && quote.fiftyTwoWeekHigh != null && (
         <Card className="mb-8 border-border/60">
           <CardContent className="pt-4 pb-4 px-5">
@@ -423,9 +414,7 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
         </Card>
       )}
 
-      {/* ── AI Analysis ── */}
       <div className="mb-8">
-        {/* Section header */}
         <div className="flex items-center justify-between gap-3 mb-5">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 rounded-xl bg-primary/10 flex items-center justify-center">
@@ -458,7 +447,6 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
           </Button>
         </div>
 
-        {/* Streaming state */}
         <AnimatePresence>
           {isAnalyzing && (
             <motion.div
@@ -484,7 +472,6 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
           )}
         </AnimatePresence>
 
-        {/* Placeholder before analysis */}
         {!analysis && !isAnalyzing && !rateLimitResetAt && (
           <Card className="border-border/50 border-dashed">
             <CardContent className="py-14 text-center">
@@ -511,7 +498,6 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
           </Card>
         )}
 
-        {/* Rate limit reached card */}
         <AnimatePresence>
           {rateLimitResetAt && !isAnalyzing && (
             <motion.div
@@ -522,7 +508,6 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
             >
               <Card className="border-amber-200/70 dark:border-amber-800/40 bg-amber-50/50 dark:bg-amber-950/20">
                 <CardContent className="py-12 text-center">
-                  {/* Pulsing icon */}
                   <div className="relative w-16 h-16 mx-auto mb-5">
                     <div
                       className="absolute inset-0 rounded-2xl bg-amber-200/60 dark:bg-amber-700/20 animate-ping"
@@ -533,7 +518,6 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
                     </div>
                   </div>
 
-                  {/* Title */}
                   <p className="text-base font-semibold text-amber-900 dark:text-amber-200 mb-1.5">
                     Rate Limit Reached
                   </p>
@@ -543,7 +527,6 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
                     this 15-minute window. Come back in:
                   </p>
 
-                  {/* Countdown clock */}
                   <div className="inline-flex flex-col items-center gap-1.5 bg-white/70 dark:bg-amber-950/60 border border-amber-200/80 dark:border-amber-700/40 rounded-2xl px-10 py-5 mb-5 shadow-sm">
                     <span className="text-4xl font-mono font-bold text-amber-700 dark:text-amber-300 tabular-nums tracking-[0.12em]">
                       {rateLimitCountdown}
@@ -553,7 +536,6 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
                     </span>
                   </div>
 
-                  {/* Exact reset time */}
                   <p className="text-xs text-amber-600/60 dark:text-amber-500/60">
                     Your limit resets at{" "}
                     <span className="font-semibold text-amber-700/80 dark:text-amber-400/80">
@@ -569,7 +551,6 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
           )}
         </AnimatePresence>
 
-        {/* Completed analysis */}
         <AnimatePresence>
           {analysis && !isAnalyzing && (
             <motion.div
@@ -578,9 +559,7 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
               transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
               className="space-y-4"
             >
-              {/* Price targets */}
               <div className="grid grid-cols-3 gap-3">
-                {/* Buy Price */}
                 <Card className="border-emerald-200/60 dark:border-emerald-800/40 bg-emerald-50/40 dark:bg-emerald-950/20">
                   <CardContent className="pt-4 pb-3 px-4">
                     <div className="flex items-center gap-1.5 mb-2">
@@ -612,7 +591,6 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
                   </CardContent>
                 </Card>
 
-                {/* Target Price */}
                 <Card className="border-blue-200/60 dark:border-blue-800/40 bg-blue-50/40 dark:bg-blue-950/20">
                   <CardContent className="pt-4 pb-3 px-4">
                     <div className="flex items-center gap-1.5 mb-2">
@@ -643,7 +621,6 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
                   </CardContent>
                 </Card>
 
-                {/* Stop Loss */}
                 <Card className="border-red-200/60 dark:border-red-800/40 bg-red-50/40 dark:bg-red-950/20">
                   <CardContent className="pt-4 pb-3 px-4">
                     <div className="flex items-center gap-1.5 mb-2">
@@ -665,7 +642,6 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
                 </Card>
               </div>
 
-              {/* Sentiment & Confidence badges */}
               <div className="flex items-center gap-2.5 flex-wrap">
                 {analysis.sentiment && sentimentConfig[analysis.sentiment] && (
                   <div
@@ -698,7 +674,6 @@ export function AssetDetail({ quote, onBack }: AssetDetailProps) {
                 )}
               </div>
 
-              {/* Detailed reasoning card */}
               <Card className="border-border/60">
                 <CardHeader className="pb-2 pt-5 px-5">
                   <div className="flex items-center gap-2">
